@@ -15,7 +15,7 @@ pub struct Context {
 const API_BASE: &'static str = "https://api.easee.com/api/";
 const REFRESH_TOKEN_DELAY: Duration = Duration::from_secs(600);
 
-#[derive(Debug)]
+#[derive(Clone,Copy,Debug,Eq,Ord,PartialEq,PartialOrd)]
 pub struct NaiveDateTime(pub chrono::NaiveDateTime);
 
 impl<'de> Deserialize<'de> for NaiveDateTime {
@@ -29,7 +29,7 @@ impl<'de> Deserialize<'de> for NaiveDateTime {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone,Copy,Debug,Eq,Ord,PartialEq,PartialOrd)]
 pub struct UtcDateTime(pub chrono::DateTime<chrono::Utc>);
 
 impl<'de> Deserialize<'de> for UtcDateTime {
@@ -44,7 +44,7 @@ impl<'de> Deserialize<'de> for UtcDateTime {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Clone,Debug,Deserialize,Eq,Ord,PartialEq,PartialOrd)]
 #[serde(rename_all="camelCase")]
 pub struct Charger {
     pub id: String,
@@ -56,7 +56,7 @@ pub struct Charger {
     pub level_of_access: u32,
 }
 
-#[derive(Deserialize_repr, Debug)]
+#[derive(Clone,Copy,Debug,Deserialize_repr,Eq,Ord,PartialEq,PartialOrd)]
 #[repr(u8)]
 pub enum ChargerOpMode {
     Zero = 0,
@@ -65,7 +65,7 @@ pub enum ChargerOpMode {
     Charging = 3,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Clone,Debug,Deserialize,PartialEq,PartialOrd)]
 #[serde(rename_all="camelCase")]
 pub struct ChargerState {
     pub smart_charging: bool,
@@ -139,7 +139,7 @@ pub struct ChargerState {
 
 }
 
-#[derive(Debug,Deserialize)]
+#[derive(Clone,Debug,Deserialize,PartialEq,PartialOrd)]
 #[serde(rename_all = "camelCase")]
 pub struct ChargingSession {
     pub charger_id: Option<String>,
@@ -166,7 +166,7 @@ pub struct Address {
 
 }
 
-#[derive(Debug,Deserialize)]
+#[derive(Clone,Debug,Deserialize,Eq,Ord,PartialEq,PartialOrd)]
 #[serde(rename_all = "camelCase")]
 pub struct Site {
     pub uuid: Option<String>,
@@ -178,7 +178,7 @@ pub struct Site {
     pub installer_alias: Option<String>
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Clone,Debug,Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LoginResponse {
     pub access_token: String,
