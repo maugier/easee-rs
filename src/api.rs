@@ -8,7 +8,7 @@ use tracing::{debug, info, instrument};
 /// API Authentication context
 #[derive(Debug)]
 pub struct Context {
-    auth_header: String,
+    auth_header: String, //TODO mark as secret to hide in tracing
     refresh_token: String,
     token_expiration: Instant,
 }
@@ -60,11 +60,27 @@ pub struct Charger {
 #[derive(Clone,Copy,Debug,Deserialize_repr,Eq,Ord,PartialEq,PartialOrd)]
 #[repr(u8)]
 pub enum ChargerOpMode {
-    Zero = 0,
-    One = 1,
+    Disconnected = 1,
     Paused = 2,
     Charging = 3,
     Finished = 4,
+    Error = 5,
+    Ready = 6,
+}
+
+#[derive(Clone,Copy,Debug,Deserialize_repr,Eq,Ord,PartialEq,PartialOrd)]
+#[repr(u8)]
+pub enum OutputPhase {
+    L1ToN = 10,
+    L2ToN = 12,
+    L3ToN = 14,
+    L1ToL2 = 11,
+    L2ToL3 = 15,
+    L3ToL1 = 13,
+    L1L2ToN = 20,
+    L2L3ToN = 21,
+    L1L3ToL2 = 22,
+    L1L2L3ToN = 30,
 }
 
 #[derive(Clone,Debug,Deserialize,PartialEq,PartialOrd)]
@@ -85,7 +101,7 @@ pub struct ChargerState {
 
     #[serde(rename="localRSSI")]
     pub local_rssi: Option<i32>,
-    pub output_phase: u32,
+    pub output_phase: OutputPhase,
     pub dynamic_circuit_current_p1: u32,
     pub dynamic_circuit_current_p2: u32,
     pub dynamic_circuit_current_p3: u32,
