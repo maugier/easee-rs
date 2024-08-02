@@ -63,6 +63,7 @@ pub enum ChargerOpMode {
     One = 1,
     Paused = 2,
     Charging = 3,
+    Finished = 4,
 }
 
 #[derive(Clone,Debug,Deserialize,PartialEq,PartialOrd)]
