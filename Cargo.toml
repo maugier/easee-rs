@@ -10,6 +10,7 @@ authors = ["Maxime Augier <max@xolus.net>"]
 chrono = { version = "0.4.38", features = ["serde"] }
 serde = { version = "1.0.204", features = ["derive"] }
 serde_json = "1.0.121"
+serde_repr = "0.1.19"
 thiserror = "1.0.63"
 tracing = "0.1.40"
 ureq = { version = "2.10.0", features = ["json"] }

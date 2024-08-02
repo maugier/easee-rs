@@ -1,7 +1,7 @@
 use std::{io, time::{Duration, Instant}};
 
-use chrono::NaiveDateTime;
 use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize};
+use serde_repr::Deserialize_repr;
 use thiserror::Error;
 use tracing::{debug, info, instrument};
 
@@ -15,13 +15,33 @@ pub struct Context {
 const API_BASE: &'static str = "https://api.easee.com/api/";
 const REFRESH_TOKEN_DELAY: Duration = Duration::from_secs(600);
 
+#[derive(Debug)]
+pub struct NaiveDateTime(pub chrono::NaiveDateTime);
 
+impl<'de> Deserialize<'de> for NaiveDateTime {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error>
+    {
+        use serde::de::Error;
+        let s = <&str as Deserialize>::deserialize(d)?;
+        let dt = chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%.f")
+            .map_err(D::Error::custom)?;
+        Ok(NaiveDateTime(dt))
+    }
+}
 
-fn parse_iso8601<'d, D: Deserializer<'d>>(de: D) -> Result<NaiveDateTime, D::Error> {
-    use serde::de::Error;
-    let s = <&str as Deserialize>::deserialize(de)?;
-    Ok(NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%.f")
-        .map_err(D::Error::custom)?)
+#[derive(Debug)]
+pub struct UtcDateTime(pub chrono::DateTime<chrono::Utc>);
+
+impl<'de> Deserialize<'de> for UtcDateTime {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error>
+    {
+        use serde::de::Error;
+        let s = <&str as Deserialize>::deserialize(d)?;
+        let dt = chrono::DateTime::parse_from_str(s, "%+")
+            .map_err(D::Error::custom)?
+            .to_utc();
+        Ok(UtcDateTime(dt))
+    }
 }
 
 #[derive(Deserialize, Debug)]
@@ -31,12 +51,18 @@ pub struct Charger {
     pub name: String,
     pub product_code: u32,
     pub color: Option<i32>,
-    #[serde(deserialize_with="parse_iso8601")]
     pub created_on: NaiveDateTime,
-
-    #[serde(deserialize_with="parse_iso8601")]
     pub updated_on: NaiveDateTime,
     pub level_of_access: u32,
+}
+
+#[derive(Deserialize_repr, Debug)]
+#[repr(u8)]
+pub enum ChargerOpMode {
+    Zero = 0,
+    One = 1,
+    Paused = 2,
+    Charging = 3,
 }
 
 #[derive(Deserialize, Debug)]
@@ -44,7 +70,7 @@ pub struct Charger {
 pub struct ChargerState {
     pub smart_charging: bool,
     pub cable_locked: bool,
-    pub charger_op_mode: u32,
+    pub charger_op_mode: ChargerOpMode,
     pub total_power: f64,
     pub session_energy: f64,
     pub energy_per_hour: f64,
@@ -58,12 +84,11 @@ pub struct ChargerState {
     #[serde(rename="localRSSI")]
     pub local_rssi: Option<i32>,
     pub output_phase: u32,
-    pub dynamic_circuit_current_p1: u32,   
+    pub dynamic_circuit_current_p1: u32,
     pub dynamic_circuit_current_p2: u32,
     pub dynamic_circuit_current_p3: u32,
 
-    //#[serde(deserialize_with="parse_iso8601")]
-    //pub latest_pulse: NaiveDateTime,
+    pub latest_pulse: UtcDateTime,
     pub charger_firmware: u32,
     pub voltage: f64,
 
@@ -115,6 +140,28 @@ pub struct ChargerState {
 }
 
 #[derive(Debug,Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChargingSession {
+    pub charger_id: Option<String>,
+    pub session_energy: f64,
+    //pub session_start: Option<NaiveDateTime>,
+    //pub session_stop: Option<NaiveDateTime>,
+    pub session_id: Option<i32>,
+    pub charge_duration_in_seconds: Option<u32>,
+    //pub first_energy_transfer_period_start: Option<NaiveDateTime>,
+    //pub last_energy_transfer_period_end: Option<NaiveDateTime>,
+    #[serde(rename = "pricePrKwhIncludingVat")]
+    pub price_per_kwh_including_vat: Option<f64>,
+    pub price_per_kwh_excluding_vat: Option<f64>,
+    pub vat_percentage: Option<f64>,
+    pub currency_id: Option<String>,
+    pub cost_including_vat: Option<f64>,
+    pub cost_excluding_vat: Option<f64>,
+
+}
+
+#[derive(Debug,Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Address {
 
 }
@@ -167,13 +214,13 @@ impl JsonExplicitError for ureq::Response {
     fn into_json_with_error<T: DeserializeOwned>(self) -> Result<T, ApiError> {
         let resp: serde_json::Value = self.into_json()?;
         let parsed = T::deserialize(&resp);
-        parsed.map_err(|e| ApiError::UnexpectedData(resp, e))        
+        parsed.map_err(|e| ApiError::UnexpectedData(resp, e))
     }
 }
 
 impl Context {
 
-    pub fn from_tokens(access_token: &str, refresh_token: String, expires_in: u32) -> Self {   
+    pub fn from_tokens(access_token: &str, refresh_token: String, expires_in: u32) -> Self {
         Self { auth_header: format!("Bearer {}", access_token),
                refresh_token,
                token_expiration: Instant::now() + Duration::from_secs(expires_in as u64) - REFRESH_TOKEN_DELAY }
@@ -245,9 +292,17 @@ impl Context {
             self.refresh_token()?;
             resp = req.call()?
         }
-        
+
         Ok(resp.into_json_with_error()?)
-    }  
+    }
+
+    fn maybe_get<T: DeserializeOwned>(&mut self, path: &str) -> Result<Option<T>, ApiError> {
+        match self.get(path) {
+            Ok(r) => Ok(Some(r)),
+            Err(ApiError::Ureq(ureq::Error::Status(404, _))) => Ok(None),
+            Err(other) => Err(other)
+        }
+    }
 
     fn post<T: DeserializeOwned, P: Serialize>(&mut self, path: &str, params: &P) -> Result<T, ApiError> {
         self.check_expired()?;
@@ -262,8 +317,8 @@ impl Context {
             self.refresh_token()?;
             resp = req.send_json(params)?
         }
-        
-        Ok(resp.into_json_with_error()?)     
+
+        Ok(resp.into_json_with_error()?)
     }
 
 }
@@ -284,11 +339,19 @@ impl Site {
 impl Charger {
     pub fn enable_smart_charging(&self, ctx: &mut Context) -> Result<(), ApiError> {
         let url = format!("chargers/{}/commands/smart_charging", &self.id);
-        ctx.post(&url, &())       
+        ctx.post(&url, &())
     }
 
     pub fn state(&self, ctx: &mut Context) -> Result<ChargerState, ApiError> {
         let url = format!("chargers/{}/state", self.id);
         ctx.get(&url)
+    }
+
+    pub fn ongoing_session(&self, ctx: &mut Context) -> Result<Option<ChargingSession>, ApiError> {
+        ctx.maybe_get(&format!("chargers/{}/sessions/ongoing", &self.id))
+    }
+
+    pub fn latest_session(&self, ctx: &mut Context) -> Result<Option<ChargingSession>, ApiError> {
+        ctx.maybe_get(&format!("chargers/{}/sessions/latest", &self.id))
     }
 }
