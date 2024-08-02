@@ -194,7 +194,7 @@ pub enum ApiError {
     IO(#[from] io::Error),
 
     #[error("ureq")]
-    Ureq(#[from] ureq::Error),
+    Ureq(#[source] Box<ureq::Error>),
 
     #[error("unexpected data: {1} when processing {0}")]
     UnexpectedData(serde_json::Value, serde_json::Error),
@@ -204,6 +204,12 @@ pub enum ApiError {
 
     #[error("format error: {0}")]
     FormatError(#[from] chrono::ParseError)
+}
+
+impl From<ureq::Error> for ApiError {
+    fn from(value: ureq::Error) -> Self {
+        ApiError::Ureq(Box::new(value))
+    }
 }
 
 trait JsonExplicitError {
@@ -299,7 +305,10 @@ impl Context {
     fn maybe_get<T: DeserializeOwned>(&mut self, path: &str) -> Result<Option<T>, ApiError> {
         match self.get(path) {
             Ok(r) => Ok(Some(r)),
-            Err(ApiError::Ureq(ureq::Error::Status(404, _))) => Ok(None),
+            Err(ApiError::Ureq(e)) => match &*e {
+                ureq::Error::Status(404, _ ) => Ok(None),
+                _ => Err(ApiError::Ureq(e))
+            },
             Err(other) => Err(other)
         }
     }
