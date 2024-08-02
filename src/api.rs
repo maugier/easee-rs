@@ -1,7 +1,7 @@
 use std::{io, time::{Duration, Instant}};
 
-use chrono::{DateTime, NaiveDateTime, Utc};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use chrono::NaiveDateTime;
+use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 use tracing::{debug, info, instrument};
 
@@ -15,8 +15,13 @@ pub struct Context {
 const API_BASE: &'static str = "https://api.easee.com/api/";
 const REFRESH_TOKEN_DELAY: Duration = Duration::from_secs(600);
 
-fn parse_iso8601(s: &str) -> Result<NaiveDateTime, ApiError> {
-    Ok(NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%.f")?)
+
+
+fn parse_iso8601<'d, D: Deserializer<'d>>(de: D) -> Result<NaiveDateTime, D::Error> {
+    use serde::de::Error;
+    let s = <&str as Deserialize>::deserialize(de)?;
+    Ok(NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%.f")
+        .map_err(D::Error::custom)?)
 }
 
 #[derive(Deserialize, Debug)]
@@ -26,8 +31,11 @@ pub struct Charger {
     pub name: String,
     pub product_code: u32,
     pub color: Option<i32>,
-    pub created_on: DateTime<Utc>,
-    pub updated_on: DateTime<Utc>,
+    #[serde(deserialize_with="parse_iso8601")]
+    pub created_on: NaiveDateTime,
+
+    #[serde(deserialize_with="parse_iso8601")]
+    pub updated_on: NaiveDateTime,
     pub level_of_access: u32,
 }
 
@@ -42,40 +50,42 @@ pub struct ChargerState {
     pub energy_per_hour: f64,
 
     #[serde(rename="wiFiRSSI")]
-    pub wifi_rssi: u32,
+    pub wifi_rssi: Option<i32>,
 
     #[serde(rename="cellRSSI")]
-    pub cell_rssi: u32,
+    pub cell_rssi: Option<i32>,
 
     #[serde(rename="localRSSI")]
-    pub local_rssi: u32,
+    pub local_rssi: Option<i32>,
     pub output_phase: u32,
     pub dynamic_circuit_current_p1: u32,   
     pub dynamic_circuit_current_p2: u32,
     pub dynamic_circuit_current_p3: u32,
-    pub latest_pulse: DateTime<Utc>,
+
+    //#[serde(deserialize_with="parse_iso8601")]
+    //pub latest_pulse: NaiveDateTime,
     pub charger_firmware: u32,
     pub voltage: f64,
 
     #[serde(rename="chargerRAT")]
     pub charger_rat: u32,
     pub lock_cable_permanently: bool,
-    pub in_current_t2: f64,
-    pub in_current_t3: f64,
-    pub in_current_t4: f64,
-    pub in_current_t5: f64,
+    pub in_current_t2: Option<f64>,
+    pub in_current_t3: Option<f64>,
+    pub in_current_t4: Option<f64>,
+    pub in_current_t5: Option<f64>,
     pub output_current: f64,
     pub is_online: bool,
-    pub in_voltage_t1_t2: f64,
-    pub in_voltage_t1_t3: f64,
-    pub in_voltage_t1_t4: f64,
-    pub in_voltage_t1_t5: f64,
-    pub in_voltage_t2_t3: f64,
-    pub in_voltage_t2_t4: f64,
-    pub in_voltage_t2_t5: f64,
-    pub in_voltage_t3_t4: f64,
-    pub in_voltage_t3_t5: f64,
-    pub in_voltage_t4_t5: f64,
+    pub in_voltage_t1_t2: Option<f64>,
+    pub in_voltage_t1_t3: Option<f64>,
+    pub in_voltage_t1_t4: Option<f64>,
+    pub in_voltage_t1_t5: Option<f64>,
+    pub in_voltage_t2_t3: Option<f64>,
+    pub in_voltage_t2_t4: Option<f64>,
+    pub in_voltage_t2_t5: Option<f64>,
+    pub in_voltage_t3_t4: Option<f64>,
+    pub in_voltage_t3_t5: Option<f64>,
+    pub in_voltage_t4_t5: Option<f64>,
     pub led_mode: u32,
     pub cable_rating: f64,
     pub dynamic_charger_current: f64,
@@ -87,18 +97,18 @@ pub struct ChargerState {
     pub circuit_total_phase_conductor_current_l3: f64,
     pub reason_for_no_current: u32,
 
-    #[serde(rename="WifiAPEnabled")]
+    #[serde(rename="wiFiAPEnabled")]
     pub wifi_ap_enabled: bool,
     pub lifetime_energy: f64,
     pub offline_max_circuit_current_p1: u32,
     pub offline_max_circuit_current_p2: u32,
     pub offline_max_circuit_current_p3: u32,
     pub error_code: u32,
-    pub fault_error_code: u32,
-    pub eq_available_current_p1: f64,
-    pub eq_available_current_p2: f64,
-    pub eq_available_current_p3: f64,
-    pub derated_current: f64,
+    pub fatal_error_code: u32,
+    pub eq_available_current_p1: Option<f64>,
+    pub eq_available_current_p2: Option<f64>,
+    pub eq_available_current_p3: Option<f64>,
+    pub derated_current: Option<f64>,
     pub derating_active: bool,
     pub connected_to_cloud: bool,
 
@@ -141,6 +151,9 @@ pub enum ApiError {
 
     #[error("unexpected data: {1} when processing {0}")]
     UnexpectedData(serde_json::Value, serde_json::Error),
+
+    #[error("could not deserialize time string")]
+    DeserializeFail,
 
     #[error("format error: {0}")]
     FormatError(#[from] chrono::ParseError)
