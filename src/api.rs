@@ -5,6 +5,7 @@ use serde_repr::Deserialize_repr;
 use thiserror::Error;
 use tracing::{debug, info, instrument};
 
+/// API Authentication context
 #[derive(Debug)]
 pub struct Context {
     auth_header: String,
@@ -191,18 +192,23 @@ pub struct LoginResponse {
 
 #[derive(Debug,Error)]
 pub enum ApiError {
+    /// HTTP call caused an IO error
     #[error("io: {0}")]
     IO(#[from] io::Error),
 
+    /// HTTP call failed (404, etc)
     #[error("ureq")]
     Ureq(#[source] Box<ureq::Error>),
 
+    /// HTTP call succeeded but the returned JSON document didn't match the expected format
     #[error("unexpected data: {1} when processing {0}")]
     UnexpectedData(serde_json::Value, serde_json::Error),
 
+    /// A JSON datetime field did not contain a string
     #[error("could not deserialize time string")]
     DeserializeFail,
 
+    /// A JSON datetime field could not be parsed
     #[error("format error: {0}")]
     FormatError(#[from] chrono::ParseError)
 }
@@ -214,6 +220,7 @@ impl From<ureq::Error> for ApiError {
 }
 
 trait JsonExplicitError {
+    /// Explicitely report the received JSON object we failed to parse
     fn into_json_with_error<T: DeserializeOwned>(self) -> Result<T, ApiError>;
 }
 
@@ -227,6 +234,7 @@ impl JsonExplicitError for ureq::Response {
 
 impl Context {
 
+    /// Build a context from provided acess tokens
     pub fn from_tokens(access_token: &str, refresh_token: String, expires_in: u32) -> Self {
         Self { auth_header: format!("Bearer {}", access_token),
                refresh_token,
@@ -237,6 +245,7 @@ impl Context {
         Self::from_tokens(&resp.access_token, resp.refresh_token, resp.expires_in)
     }
 
+    /// Retrieve access tokens online, by logging in with the provided credentials
     pub fn from_login(user: &str, password: &str) -> Result<Self, ApiError> {
         #[derive(Serialize)]
         #[serde(rename_all="camelCase")]
@@ -251,6 +260,7 @@ impl Context {
         Ok(Self::from_login_response(resp))
     }
 
+    /// Check if the token has reached its expiration date
     fn check_expired(&mut self) -> Result<(), ApiError> {
         if self.token_expiration < Instant::now() {
             debug!("Token has expired");
@@ -259,6 +269,7 @@ impl Context {
         Ok(())
     }
 
+    /// Use the refresh token to refresh credentials
     pub fn refresh_token(&mut self) -> Result<(), ApiError> {
         #[derive(Serialize)]
         #[serde(rename_all="camelCase")]
@@ -277,10 +288,12 @@ impl Context {
 
     }
 
+    /// List all sites available to the user
     pub fn sites(&mut self) -> Result<Vec<Site>, ApiError> {
         self.get("sites")
     }
 
+    /// List all chargers available to the user
     pub fn chargers(&mut self) -> Result<Vec<Charger>, ApiError> {
         self.get("chargers")
     }
@@ -333,34 +346,43 @@ impl Context {
 
 }
 
+/// Energy meter reading
 #[derive(Debug, Deserialize)]
 #[serde(rename_all="camelCase")]
 pub struct MeterReading {
+    /// ID of the charger
     pub charger_id: String,
+
+    /// Lifetime consumed energy, in kWh
     pub life_time_energy: f64,
 }
 
 impl Site {
+    /// Read all energy meters from the given site
     pub fn lifetime_energy(&self, ctx: &mut Context) -> Result<Vec<MeterReading>, ApiError> {
         ctx.get(&format!("sites/{}/energy", self.id))
     }
 }
 
 impl Charger {
+    /// Enable "smart charging" on the charger. This just turns the LED blue, and disables basic charging plans.
     pub fn enable_smart_charging(&self, ctx: &mut Context) -> Result<(), ApiError> {
         let url = format!("chargers/{}/commands/smart_charging", &self.id);
         ctx.post(&url, &())
     }
 
+    /// Read the state of a charger
     pub fn state(&self, ctx: &mut Context) -> Result<ChargerState, ApiError> {
         let url = format!("chargers/{}/state", self.id);
         ctx.get(&url)
     }
 
+    /// Read info about the ongoing charging session
     pub fn ongoing_session(&self, ctx: &mut Context) -> Result<Option<ChargingSession>, ApiError> {
         ctx.maybe_get(&format!("chargers/{}/sessions/ongoing", &self.id))
     }
 
+    /// Read info about the last charging session (not including ongoing one)
     pub fn latest_session(&self, ctx: &mut Context) -> Result<Option<ChargingSession>, ApiError> {
         ctx.maybe_get(&format!("chargers/{}/sessions/latest", &self.id))
     }
