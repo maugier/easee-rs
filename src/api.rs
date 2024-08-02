@@ -13,7 +13,7 @@ pub struct Context {
     token_expiration: Instant,
 }
 
-const API_BASE: &'static str = "https://api.easee.com/api/";
+const API_BASE: &str = "https://api.easee.com/api/";
 const REFRESH_TOKEN_DELAY: Duration = Duration::from_secs(600);
 
 #[derive(Clone,Copy,Debug,Eq,Ord,PartialEq,PartialOrd)]
@@ -280,7 +280,7 @@ impl Context {
         let url = format!("{}accounts/refresh_token", API_BASE);
         let resp: LoginResponse = ureq::post(&url)
             .set("Content-type", "application/json")
-            .send_json(&params)?
+            .send_json(params)?
             .into_json_with_error()?;
 
         *self = Self::from_login_response(resp);
@@ -313,7 +313,7 @@ impl Context {
             resp = req.call()?
         }
 
-        Ok(resp.into_json_with_error()?)
+        resp.into_json_with_error()
     }
 
     fn maybe_get<T: DeserializeOwned>(&mut self, path: &str) -> Result<Option<T>, ApiError> {
@@ -341,7 +341,7 @@ impl Context {
             resp = req.send_json(params)?
         }
 
-        Ok(resp.into_json_with_error()?)
+        resp.into_json_with_error()
     }
 
 }
