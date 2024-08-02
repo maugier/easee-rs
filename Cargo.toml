@@ -20,4 +20,5 @@ serde_json = "1.0.121"
 serde_repr = "0.1.19"
 thiserror = "1.0.63"
 tracing = "0.1.40"
+tungstenite = { version = "0.23.0", optional = true, features = ["rustls-tls-native-roots"] }
 ureq = { version = "2.10.0", features = ["json"] }

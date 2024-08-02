@@ -71,6 +71,7 @@ pub enum ChargerOpMode {
 #[derive(Clone,Copy,Debug,Deserialize_repr,Eq,Ord,PartialEq,PartialOrd)]
 #[repr(u8)]
 pub enum OutputPhase {
+    Unknown = 0,
     L1ToN = 10,
     L2ToN = 12,
     L3ToN = 14,
@@ -285,6 +286,10 @@ impl Context {
         Ok(())
     }
 
+    pub(crate) fn auth_token(&self) -> &str {
+        &self.auth_header[7..]
+    }
+
     /// Use the refresh token to refresh credentials
     pub fn refresh_token(&mut self) -> Result<(), ApiError> {
         #[derive(Serialize)]
@@ -343,10 +348,14 @@ impl Context {
         }
     }
 
-    fn post<T: DeserializeOwned, P: Serialize>(&mut self, path: &str, params: &P) -> Result<T, ApiError> {
-        self.check_expired()?;
+    pub(crate) fn post<T: DeserializeOwned, P: Serialize>(&mut self, path: &str, params: &P) -> Result<T, ApiError> {
         let url: String = format!("{}{}", API_BASE, path);
-        let req = ureq::post(&url)
+        self.post_raw(&url, params)
+    }
+
+    pub(crate) fn post_raw<T: DeserializeOwned, P: Serialize>(&mut self, url: &str, params: &P) -> Result<T, ApiError> {
+        self.check_expired()?;
+        let req = ureq::post(url)
             .set("Accept", "application/json")
             .set("Authorization", &self.auth_header);
 
