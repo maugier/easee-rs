@@ -31,9 +31,6 @@ pub enum RecvError {
     #[error("Bad message type")]
     BadMessageType,
 
-    #[error("Not a SignalR message: {0:?}")]
-    NotSignalRMessage(String),
-
     #[error("Invalid json: {0}")]
     InvalidJson(#[from] serde_json::Error),
 
@@ -41,7 +38,9 @@ pub enum RecvError {
     TungsteniteError(#[from] tungstenite::Error),    
 }
 
-pub struct Stream { sock: WebSocket<MaybeTlsStream<TcpStream>> }
+pub struct Stream { 
+    sock: WebSocket<MaybeTlsStream<TcpStream>>,
+}
 
 impl Stream {
     pub fn open(ctx: &mut Context) -> Result<Stream, NegotiateError> {
@@ -88,15 +87,15 @@ impl Stream {
         self.sock.send(Message::Text(msg))
     }
 
-    pub fn recv(&mut self) -> Result<serde_json::Value, RecvError> {
+    pub fn recv(&mut self) -> Result<Vec<serde_json::Value>, RecvError> {
         let msg = self.sock.read()?;
         let Message::Text(txt) = msg else { return Err(RecvError::BadMessageType) };
-        let json: &str = match txt.strip_suffix("\x1E") {
-            None => return Err(RecvError::NotSignalRMessage(txt)),
-            Some(json) => json
-        };
-        dbg!(&json);
-        Ok(serde_json::from_str(json)?)
+
+        let msgs = txt.split_terminator('\x1E')
+           .filter_map(|s| serde_json::from_str(s).ok())
+           .collect();
+
+        Ok(msgs)
     }
 
     pub fn subscribe(&mut self, id: &str) -> Result<(), tungstenite::Error> {
