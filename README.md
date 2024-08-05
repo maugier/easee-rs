@@ -5,7 +5,7 @@ Work in progress.
 ## Features and Todo
 
  - Authn/z
-   - [x] Token authentication
+   - [x] Authentication and token retrieval
    - [ ] Persistence of tokens
  - Core functionality
    - [x] Enumerate sites and chargers
@@ -13,9 +13,12 @@ Work in progress.
    - [x] Read charger status
    - [ ] Control charging (start/pause/resume/stop)
    - [ ] Control dynamic current limits
-   - [ ] Websocket event stream
+ - Event stream
+   - [x] Websocket connection (raw SignalR messages)
+   - [ ] Event decoding
  - Ergonomics
    - [ ] Enums for protocol constants
+   - [ ] Proper SignalR support with Tokio
 
  
  
