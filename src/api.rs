@@ -411,4 +411,27 @@ impl Charger {
     pub fn latest_session(&self, ctx: &mut Context) -> Result<Option<ChargingSession>, ApiError> {
         ctx.maybe_get(&format!("chargers/{}/sessions/latest", &self.id))
     }
+
+    fn command(&self, ctx: &mut Context, command: &str) -> Result<(), ApiError> {
+        ctx.post(&format!("chargers/{}/commands/{}", self.id, command), &())
+    }
+
+    pub fn start(&self, ctx: &mut Context) -> Result<(), ApiError> {
+        self.command(ctx, "start_charging")
+    }
+
+    pub fn pause(&self, ctx: &mut Context) -> Result<(), ApiError> {
+        self.command(ctx, "pause_charging")
+    }
+
+    pub fn resume(&self, ctx: &mut Context) -> Result<(), ApiError> {
+        self.command(ctx, "resume_charging")
+    }
+
+    pub fn stop(&self, ctx: &mut Context) -> Result<(), ApiError> {
+        self.command(ctx, "stop_charging")
+    }
+
+
+
 }
