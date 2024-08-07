@@ -1,23 +1,24 @@
 use std::net::TcpStream;
 
-use tungstenite::{stream::MaybeTlsStream, WebSocket, Message};
+use super::api::{ApiError, Context};
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
-use super::api::{Context, ApiError};
 use serde_json::json;
+use thiserror::Error;
+use tungstenite::{stream::MaybeTlsStream, Message, WebSocket};
 
-const STREAM_API_NEGOTIATION_URL: &str = "https://streams.easee.com/hubs/products/negotiate?negotiateVersion=1";
+const STREAM_API_NEGOTIATION_URL: &str =
+    "https://streams.easee.com/hubs/products/negotiate?negotiateVersion=1";
 const WSS_URL: &str = "wss://streams.easee.com/hubs/products";
 
-#[derive(Clone,Debug,Deserialize,PartialEq,PartialOrd)]
-#[serde(rename_all="camelCase")]
+#[derive(Clone, Debug, Deserialize, PartialEq, PartialOrd)]
+#[serde(rename_all = "camelCase")]
 struct NegotiateResponse {
     negotiate_version: u16,
     connection_id: String,
     connection_token: String,
 }
 
-#[derive(Debug,Error)]
+#[derive(Debug, Error)]
 pub enum NegotiateError {
     #[error("API error: {0}")]
     ApiError(#[from] ApiError),
@@ -26,7 +27,7 @@ pub enum NegotiateError {
     TungsteniteError(#[from] tungstenite::Error),
 }
 
-#[derive(Debug,Error)]
+#[derive(Debug, Error)]
 pub enum RecvError {
     #[error("Bad message type")]
     BadMessageType,
@@ -35,10 +36,10 @@ pub enum RecvError {
     InvalidJson(#[from] serde_json::Error),
 
     #[error("WS error: {0}")]
-    TungsteniteError(#[from] tungstenite::Error),    
+    TungsteniteError(#[from] tungstenite::Error),
 }
 
-pub struct Stream { 
+pub struct Stream {
     sock: WebSocket<MaybeTlsStream<TcpStream>>,
 }
 
@@ -48,8 +49,10 @@ impl Stream {
         dbg!(&r);
 
         let token = ctx.auth_token();
-        let wss_url = format!("{}?id={}&access_token={}", WSS_URL, 
-            r.connection_token, token);
+        let wss_url = format!(
+            "{}?id={}&access_token={}",
+            WSS_URL, r.connection_token, token
+        );
         dbg!(&wss_url);
 
         /*
@@ -72,7 +75,10 @@ impl Stream {
         let resp = tungstenite::client::connect(&wss_url);
 
         if let Err(tungstenite::Error::Http(he)) = &resp {
-            eprintln!("Response: {}", std:: str::from_utf8(&he.body().as_ref().unwrap()).unwrap());
+            eprintln!(
+                "Response: {}",
+                std::str::from_utf8(&he.body().as_ref().unwrap()).unwrap()
+            );
         }
 
         let mut stream = Stream { sock: resp?.0 };
@@ -89,11 +95,14 @@ impl Stream {
 
     pub fn recv(&mut self) -> Result<Vec<serde_json::Value>, RecvError> {
         let msg = self.sock.read()?;
-        let Message::Text(txt) = msg else { return Err(RecvError::BadMessageType) };
+        let Message::Text(txt) = msg else {
+            return Err(RecvError::BadMessageType);
+        };
 
-        let msgs = txt.split_terminator('\x1E')
-           .filter_map(|s| serde_json::from_str(s).ok())
-           .collect();
+        let msgs = txt
+            .split_terminator('\x1E')
+            .filter_map(|s| serde_json::from_str(s).ok())
+            .collect();
 
         Ok(msgs)
     }
@@ -104,5 +113,4 @@ impl Stream {
                                "target": "SubscribeWithCurrentState",
                                "type": 1} ))
     }
-
 }

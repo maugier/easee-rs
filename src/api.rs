@@ -1,4 +1,7 @@
-use std::{io, time::{Duration, Instant}};
+use std::{
+    io,
+    time::{Duration, Instant},
+};
 
 use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize};
 use serde_repr::Deserialize_repr;
@@ -16,12 +19,11 @@ pub struct Context {
 const API_BASE: &str = "https://api.easee.com/api/";
 const REFRESH_TOKEN_DELAY: Duration = Duration::from_secs(600);
 
-#[derive(Clone,Copy,Debug,Eq,Ord,PartialEq,PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct NaiveDateTime(pub chrono::NaiveDateTime);
 
 impl<'de> Deserialize<'de> for NaiveDateTime {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error>
-    {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         use serde::de::Error;
         let s = <&str as Deserialize>::deserialize(d)?;
         let dt = chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%.f")
@@ -30,12 +32,11 @@ impl<'de> Deserialize<'de> for NaiveDateTime {
     }
 }
 
-#[derive(Clone,Copy,Debug,Eq,Ord,PartialEq,PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct UtcDateTime(pub chrono::DateTime<chrono::Utc>);
 
 impl<'de> Deserialize<'de> for UtcDateTime {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error>
-    {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         use serde::de::Error;
         let s = <&str as Deserialize>::deserialize(d)?;
         let dt = chrono::DateTime::parse_from_str(s, "%+")
@@ -45,8 +46,8 @@ impl<'de> Deserialize<'de> for UtcDateTime {
     }
 }
 
-#[derive(Clone,Debug,Deserialize,Eq,Ord,PartialEq,PartialOrd)]
-#[serde(rename_all="camelCase")]
+#[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
+#[serde(rename_all = "camelCase")]
 pub struct Charger {
     pub id: String,
     pub name: String,
@@ -57,7 +58,7 @@ pub struct Charger {
     pub level_of_access: u32,
 }
 
-#[derive(Clone,Copy,Debug,Deserialize_repr,Eq,Ord,PartialEq,PartialOrd)]
+#[derive(Clone, Copy, Debug, Deserialize_repr, Eq, Ord, PartialEq, PartialOrd)]
 #[repr(u8)]
 pub enum ChargerOpMode {
     Disconnected = 1,
@@ -68,7 +69,7 @@ pub enum ChargerOpMode {
     Ready = 6,
 }
 
-#[derive(Clone,Copy,Debug,Deserialize_repr,Eq,Ord,PartialEq,PartialOrd)]
+#[derive(Clone, Copy, Debug, Deserialize_repr, Eq, Ord, PartialEq, PartialOrd)]
 #[repr(u8)]
 pub enum OutputPhase {
     Unknown = 0,
@@ -84,8 +85,8 @@ pub enum OutputPhase {
     L1L2L3ToN = 30,
 }
 
-#[derive(Clone,Debug,Deserialize,PartialEq,PartialOrd)]
-#[serde(rename_all="camelCase")]
+#[derive(Clone, Debug, Deserialize, PartialEq, PartialOrd)]
+#[serde(rename_all = "camelCase")]
 pub struct ChargerState {
     pub smart_charging: bool,
     pub cable_locked: bool,
@@ -94,13 +95,13 @@ pub struct ChargerState {
     pub session_energy: f64,
     pub energy_per_hour: f64,
 
-    #[serde(rename="wiFiRSSI")]
+    #[serde(rename = "wiFiRSSI")]
     pub wifi_rssi: Option<i32>,
 
-    #[serde(rename="cellRSSI")]
+    #[serde(rename = "cellRSSI")]
     pub cell_rssi: Option<i32>,
 
-    #[serde(rename="localRSSI")]
+    #[serde(rename = "localRSSI")]
     pub local_rssi: Option<i32>,
     pub output_phase: OutputPhase,
     pub dynamic_circuit_current_p1: u32,
@@ -111,7 +112,7 @@ pub struct ChargerState {
     pub charger_firmware: u32,
     pub voltage: f64,
 
-    #[serde(rename="chargerRAT")]
+    #[serde(rename = "chargerRAT")]
     pub charger_rat: u32,
     pub lock_cable_permanently: bool,
     pub in_current_t2: Option<f64>,
@@ -141,7 +142,7 @@ pub struct ChargerState {
     pub circuit_total_phase_conductor_current_l3: f64,
     pub reason_for_no_current: u32,
 
-    #[serde(rename="wiFiAPEnabled")]
+    #[serde(rename = "wiFiAPEnabled")]
     pub wifi_ap_enabled: bool,
     pub lifetime_energy: f64,
     pub offline_max_circuit_current_p1: u32,
@@ -155,10 +156,9 @@ pub struct ChargerState {
     pub derated_current: Option<f64>,
     pub derating_active: bool,
     pub connected_to_cloud: bool,
-
 }
 
-#[derive(Clone,Debug,Deserialize,PartialEq,PartialOrd)]
+#[derive(Clone, Debug, Deserialize, PartialEq, PartialOrd)]
 #[serde(rename_all = "camelCase")]
 pub struct ChargingSession {
     pub charger_id: Option<String>,
@@ -176,16 +176,13 @@ pub struct ChargingSession {
     pub currency_id: Option<String>,
     pub cost_including_vat: Option<f64>,
     pub cost_excluding_vat: Option<f64>,
-
 }
 
-#[derive(Debug,Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Address {
+pub struct Address {}
 
-}
-
-#[derive(Clone,Debug,Deserialize,Eq,Ord,PartialEq,PartialOrd)]
+#[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
 #[serde(rename_all = "camelCase")]
 pub struct Site {
     pub uuid: Option<String>,
@@ -194,20 +191,28 @@ pub struct Site {
     pub name: Option<String>,
     pub level_of_access: u32,
     //pub address: Address,
-    pub installer_alias: Option<String>
+    pub installer_alias: Option<String>,
 }
 
-#[derive(Clone,Debug,Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LoginResponse {
     pub access_token: String,
     pub expires_in: u32,
     pub access_claims: Vec<Option<String>>,
     pub token_type: Option<String>,
-    pub refresh_token: String
+    pub refresh_token: String,
 }
 
-#[derive(Debug,Error)]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CommandReply {
+    command_id: u64,
+    device: String,
+    ticks: u64,
+}
+
+#[derive(Debug, Error)]
 pub enum ApiError {
     /// HTTP call caused an IO error
     #[error("io: {0}")]
@@ -227,7 +232,7 @@ pub enum ApiError {
 
     /// A JSON datetime field could not be parsed
     #[error("format error: {0}")]
-    FormatError(#[from] chrono::ParseError)
+    FormatError(#[from] chrono::ParseError),
 }
 
 impl From<ureq::Error> for ApiError {
@@ -250,12 +255,14 @@ impl JsonExplicitError for ureq::Response {
 }
 
 impl Context {
-
     /// Build a context from provided acess tokens
     pub fn from_tokens(access_token: &str, refresh_token: String, expires_in: u32) -> Self {
-        Self { auth_header: format!("Bearer {}", access_token),
-               refresh_token,
-               token_expiration: Instant::now() + Duration::from_secs(expires_in as u64) - REFRESH_TOKEN_DELAY }
+        Self {
+            auth_header: format!("Bearer {}", access_token),
+            refresh_token,
+            token_expiration: Instant::now() + Duration::from_secs(expires_in as u64)
+                - REFRESH_TOKEN_DELAY,
+        }
     }
 
     fn from_login_response(resp: LoginResponse) -> Self {
@@ -265,13 +272,19 @@ impl Context {
     /// Retrieve access tokens online, by logging in with the provided credentials
     pub fn from_login(user: &str, password: &str) -> Result<Self, ApiError> {
         #[derive(Serialize)]
-        #[serde(rename_all="camelCase")]
-        struct Params<'t> { user_name: &'t str, password: &'t str }
+        #[serde(rename_all = "camelCase")]
+        struct Params<'t> {
+            user_name: &'t str,
+            password: &'t str,
+        }
 
         info!("Logging into API");
         let url: String = format!("{}accounts/login", API_BASE);
         let resp: LoginResponse = ureq::post(&url)
-            .send_json(Params { user_name: user, password } )?
+            .send_json(Params {
+                user_name: user,
+                password,
+            })?
             .into_json_with_error()?;
 
         Ok(Self::from_login_response(resp))
@@ -293,11 +306,15 @@ impl Context {
     /// Use the refresh token to refresh credentials
     pub fn refresh_token(&mut self) -> Result<(), ApiError> {
         #[derive(Serialize)]
-        #[serde(rename_all="camelCase")]
-        struct Params<'t> { refresh_token: &'t str }
+        #[serde(rename_all = "camelCase")]
+        struct Params<'t> {
+            refresh_token: &'t str,
+        }
 
         info!("Refreshing access token");
-        let params = Params { refresh_token: &self.refresh_token };
+        let params = Params {
+            refresh_token: &self.refresh_token,
+        };
         let url = format!("{}accounts/refresh_token", API_BASE);
         let resp: LoginResponse = ureq::post(&url)
             .set("Content-type", "application/json")
@@ -306,7 +323,6 @@ impl Context {
 
         *self = Self::from_login_response(resp);
         Ok(())
-
     }
 
     /// List all sites available to the user
@@ -341,19 +357,27 @@ impl Context {
         match self.get(path) {
             Ok(r) => Ok(Some(r)),
             Err(ApiError::Ureq(e)) => match &*e {
-                ureq::Error::Status(404, _ ) => Ok(None),
-                _ => Err(ApiError::Ureq(e))
+                ureq::Error::Status(404, _) => Ok(None),
+                _ => Err(ApiError::Ureq(e)),
             },
-            Err(other) => Err(other)
+            Err(other) => Err(other),
         }
     }
 
-    pub(crate) fn post<T: DeserializeOwned, P: Serialize>(&mut self, path: &str, params: &P) -> Result<T, ApiError> {
+    pub(crate) fn post<T: DeserializeOwned, P: Serialize>(
+        &mut self,
+        path: &str,
+        params: &P,
+    ) -> Result<T, ApiError> {
         let url: String = format!("{}{}", API_BASE, path);
         self.post_raw(&url, params)
     }
 
-    pub(crate) fn post_raw<T: DeserializeOwned, P: Serialize>(&mut self, url: &str, params: &P) -> Result<T, ApiError> {
+    pub(crate) fn post_raw<T: DeserializeOwned, P: Serialize>(
+        &mut self,
+        url: &str,
+        params: &P,
+    ) -> Result<T, ApiError> {
         self.check_expired()?;
         let req = ureq::post(url)
             .set("Accept", "application/json")
@@ -368,12 +392,11 @@ impl Context {
 
         resp.into_json_with_error()
     }
-
 }
 
 /// Energy meter reading
 #[derive(Debug, Deserialize)]
-#[serde(rename_all="camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct MeterReading {
     /// ID of the charger
     pub charger_id: String,
@@ -412,26 +435,27 @@ impl Charger {
         ctx.maybe_get(&format!("chargers/{}/sessions/latest", &self.id))
     }
 
-    fn command(&self, ctx: &mut Context, command: &str) -> Result<(), ApiError> {
+    fn command(&self, ctx: &mut Context, command: &str) -> Result<CommandReply, ApiError> {
         ctx.post(&format!("chargers/{}/commands/{}", self.id, command), &())
     }
 
     pub fn start(&self, ctx: &mut Context) -> Result<(), ApiError> {
-        self.command(ctx, "start_charging")
+        self.command(ctx, "start_charging")?;
+        Ok(())
     }
 
     pub fn pause(&self, ctx: &mut Context) -> Result<(), ApiError> {
-        self.command(ctx, "pause_charging")
+        self.command(ctx, "pause_charging")?;
+        Ok(())
     }
 
     pub fn resume(&self, ctx: &mut Context) -> Result<(), ApiError> {
-        self.command(ctx, "resume_charging")
+        self.command(ctx, "resume_charging")?;
+        Ok(())
     }
 
     pub fn stop(&self, ctx: &mut Context) -> Result<(), ApiError> {
-        self.command(ctx, "stop_charging")
+        self.command(ctx, "stop_charging")?;
+        Ok(())
     }
-
-
-
 }
