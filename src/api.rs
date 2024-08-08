@@ -1,6 +1,6 @@
 use std::{
     io,
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize};
@@ -17,7 +17,6 @@ pub struct Context {
 }
 
 const API_BASE: &str = "https://api.easee.com/api/";
-const REFRESH_TOKEN_DELAY: Duration = Duration::from_secs(600);
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct NaiveDateTime(pub chrono::NaiveDateTime);
@@ -204,6 +203,7 @@ pub struct LoginResponse {
     pub refresh_token: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct CommandReply {
@@ -233,6 +233,9 @@ pub enum ApiError {
     /// A JSON datetime field could not be parsed
     #[error("format error: {0}")]
     FormatError(#[from] chrono::ParseError),
+
+    #[error("Invalid ID: {0:?}")]
+    InvalidID(String)
 }
 
 impl From<ureq::Error> for ApiError {
@@ -254,19 +257,44 @@ impl JsonExplicitError for ureq::Response {
     }
 }
 
+#[derive(Debug,Error)]
+pub enum TokenParseError {
+    #[error("Bad line count")]
+    IncorrectLineCount,
+
+    #[error("Parse error: {0}")]
+    ParseIntError(#[from] std::num::ParseIntError),
+}
+
 impl Context {
-    /// Build a context from provided acess tokens
-    pub fn from_tokens(access_token: &str, refresh_token: String, expires_in: u32) -> Self {
+
+    fn from_login_response(resp: LoginResponse) -> Self {
         Self {
-            auth_header: format!("Bearer {}", access_token),
-            refresh_token,
-            token_expiration: Instant::now() + Duration::from_secs(expires_in as u64)
-                - REFRESH_TOKEN_DELAY,
+            auth_header: format!("Bearer {}", &resp.access_token),
+            refresh_token: resp.refresh_token,
+            token_expiration: (Instant::now() + Duration::from_secs(resp.expires_in as u64))
         }
     }
 
-    fn from_login_response(resp: LoginResponse) -> Self {
-        Self::from_tokens(&resp.access_token, resp.refresh_token, resp.expires_in)
+    pub fn from_saved(saved: &str) -> Result<Self,TokenParseError> {
+        let lines: Vec<&str> = saved.lines().collect();
+        let &[token, refresh, expire] = &*lines else { return Err(TokenParseError::IncorrectLineCount) };
+
+        let expire: u64 = expire.parse()?;
+        let token_expiration = Instant::now() + (UNIX_EPOCH + Duration::from_secs(expire)).duration_since(SystemTime::now()).unwrap_or_default();
+
+        Ok(Self {
+            auth_header: format!("Bearer {}", token),
+            refresh_token: refresh.to_owned(),
+            token_expiration,
+        })
+
+    }
+
+    pub fn save(&self) -> String {
+        let expiration = (SystemTime::now() + (self.token_expiration - Instant::now())).duration_since(UNIX_EPOCH)
+            .unwrap();
+        format!("{}\n{}\n{}\n", self.auth_token(), self.refresh_token, expiration.as_secs())
     }
 
     /// Retrieve access tokens online, by logging in with the provided credentials
@@ -333,6 +361,13 @@ impl Context {
     /// List all chargers available to the user
     pub fn chargers(&mut self) -> Result<Vec<Charger>, ApiError> {
         self.get("chargers")
+    }
+
+    pub fn charger(&mut self, id: &str) -> Result<Charger, ApiError> {
+        if !id.chars().all(char::is_alphanumeric) {
+            return Err(ApiError::InvalidID(id.to_owned()))
+        }
+        self.get(&format!("chargers/{}", id))
     }
 
     #[instrument]
@@ -457,5 +492,28 @@ impl Charger {
     pub fn stop(&self, ctx: &mut Context) -> Result<(), ApiError> {
         self.command(ctx, "stop_charging")?;
         Ok(())
+    }
+}
+
+
+#[cfg(test)]
+mod test {
+    use std::time::{Duration, Instant};
+
+    use super::Context;
+    #[test]
+    fn token_save() {
+
+        let ctx = Context { auth_header: "Bearer aaaaaaa0".to_owned()
+                                   , refresh_token: "abcdef".to_owned()
+                                   , token_expiration: Instant::now() + Duration::from_secs(1234) };
+
+        let saved = ctx.save();
+        let ctx2 = Context::from_saved(&saved).unwrap();
+
+        assert_eq!(&ctx.auth_header, &ctx2.auth_header);
+        assert_eq!(&ctx.refresh_token, &ctx2.refresh_token);
+        assert!( (ctx.token_expiration - ctx2.token_expiration) < Duration::from_secs(5))
+
     }
 }
