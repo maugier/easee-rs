@@ -8,12 +8,22 @@ use serde_repr::Deserialize_repr;
 use thiserror::Error;
 use tracing::{debug, info, instrument};
 
-/// API Authentication context
-#[derive(Debug)]
 pub struct Context {
-    auth_header: String, //TODO mark as secret to hide in tracing
+    auth_header: String,
     refresh_token: String,
     token_expiration: Instant,
+    on_refresh: Option<Box<dyn FnMut(&mut Self)>>,
+}
+
+impl std::fmt::Debug for Context {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Context")
+            .field("auth_header", &"<secret>")
+            .field("refresh_token", &"<secret>")
+            .field("token_expiration", &self.token_expiration)
+            .field("on_refresh", &"[closure]")
+            .finish()
+    }
 }
 
 const API_BASE: &str = "https://api.easee.com/api/";
@@ -272,7 +282,8 @@ impl Context {
         Self {
             auth_header: format!("Bearer {}", &resp.access_token),
             refresh_token: resp.refresh_token,
-            token_expiration: (Instant::now() + Duration::from_secs(resp.expires_in as u64))
+            token_expiration: (Instant::now() + Duration::from_secs(resp.expires_in as u64)),
+            on_refresh: None,
         }
     }
 
@@ -287,8 +298,13 @@ impl Context {
             auth_header: format!("Bearer {}", token),
             refresh_token: refresh.to_owned(),
             token_expiration,
+            on_refresh: None,
         })
+    }
 
+    pub fn on_refresh<F: FnMut(&mut Self) + 'static>(mut self, on_refresh: F) -> Self {
+        self.on_refresh = Some(Box::new(on_refresh));
+        self
     }
 
     pub fn save(&self) -> String {
@@ -503,10 +519,12 @@ mod test {
     use super::Context;
     #[test]
     fn token_save() {
-
-        let ctx = Context { auth_header: "Bearer aaaaaaa0".to_owned()
-                                   , refresh_token: "abcdef".to_owned()
-                                   , token_expiration: Instant::now() + Duration::from_secs(1234) };
+        let ctx = Context {
+            auth_header: "Bearer aaaaaaa0".to_owned(),
+            refresh_token: "abcdef".to_owned(),
+            token_expiration: Instant::now() + Duration::from_secs(1234),
+            on_refresh: None,
+        };
 
         let saved = ctx.save();
         let ctx2 = Context::from_saved(&saved).unwrap();
