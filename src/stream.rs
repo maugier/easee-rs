@@ -1,8 +1,7 @@
-use std::net::TcpStream;
-
 use super::api::{ApiError, Context};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::net::TcpStream;
 use thiserror::Error;
 use tungstenite::{stream::MaybeTlsStream, Message, WebSocket};
 
@@ -87,7 +86,7 @@ impl Stream {
         Ok(stream)
     }
 
-    fn send<T: Serialize>(&mut self, msg: T) -> Result<(), tungstenite::Error> {
+    pub fn send<T: Serialize>(&mut self, msg: T) -> Result<(), tungstenite::Error> {
         let mut msg = serde_json::to_string(&msg).unwrap();
         msg.push('\x1E');
         self.sock.send(Message::Text(msg))
@@ -105,12 +104,5 @@ impl Stream {
             .collect();
 
         Ok(msgs)
-    }
-
-    pub fn subscribe(&mut self, id: &str) -> Result<(), tungstenite::Error> {
-        self.send(json!( { "arguments": [id, true],
-                               "invocationId": "0",
-                               "target": "SubscribeWithCurrentState",
-                               "type": 1} ))
     }
 }

@@ -70,6 +70,7 @@ pub struct Charger {
 #[derive(Clone, Copy, Debug, Deserialize_repr, Eq, Ord, PartialEq, PartialOrd)]
 #[repr(u8)]
 pub enum ChargerOpMode {
+    Unknown = 0,
     Disconnected = 1,
     Paused = 2,
     Charging = 3,
