@@ -246,7 +246,7 @@ pub enum ApiError {
     FormatError(#[from] chrono::ParseError),
 
     #[error("Invalid ID: {0:?}")]
-    InvalidID(String)
+    InvalidID(String),
 }
 
 impl From<ureq::Error> for ApiError {
@@ -268,7 +268,7 @@ impl JsonExplicitError for ureq::Response {
     }
 }
 
-#[derive(Debug,Error)]
+#[derive(Debug, Error)]
 pub enum TokenParseError {
     #[error("Bad line count")]
     IncorrectLineCount,
@@ -278,7 +278,6 @@ pub enum TokenParseError {
 }
 
 impl Context {
-
     fn from_login_response(resp: LoginResponse) -> Self {
         Self {
             auth_header: format!("Bearer {}", &resp.access_token),
@@ -288,12 +287,17 @@ impl Context {
         }
     }
 
-    pub fn from_saved(saved: &str) -> Result<Self,TokenParseError> {
+    pub fn from_saved(saved: &str) -> Result<Self, TokenParseError> {
         let lines: Vec<&str> = saved.lines().collect();
-        let &[token, refresh, expire] = &*lines else { return Err(TokenParseError::IncorrectLineCount) };
+        let &[token, refresh, expire] = &*lines else {
+            return Err(TokenParseError::IncorrectLineCount);
+        };
 
         let expire: u64 = expire.parse()?;
-        let token_expiration = Instant::now() + (UNIX_EPOCH + Duration::from_secs(expire)).duration_since(SystemTime::now()).unwrap_or_default();
+        let token_expiration = Instant::now()
+            + (UNIX_EPOCH + Duration::from_secs(expire))
+                .duration_since(SystemTime::now())
+                .unwrap_or_default();
 
         Ok(Self {
             auth_header: format!("Bearer {}", token),
@@ -309,9 +313,15 @@ impl Context {
     }
 
     pub fn save(&self) -> String {
-        let expiration = (SystemTime::now() + (self.token_expiration - Instant::now())).duration_since(UNIX_EPOCH)
+        let expiration = (SystemTime::now() + (self.token_expiration - Instant::now()))
+            .duration_since(UNIX_EPOCH)
             .unwrap();
-        format!("{}\n{}\n{}\n", self.auth_token(), self.refresh_token, expiration.as_secs())
+        format!(
+            "{}\n{}\n{}\n",
+            self.auth_token(),
+            self.refresh_token,
+            expiration.as_secs()
+        )
     }
 
     /// Retrieve access tokens online, by logging in with the provided credentials
@@ -382,7 +392,7 @@ impl Context {
 
     pub fn charger(&mut self, id: &str) -> Result<Charger, ApiError> {
         if !id.chars().all(char::is_alphanumeric) {
-            return Err(ApiError::InvalidID(id.to_owned()))
+            return Err(ApiError::InvalidID(id.to_owned()));
         }
         self.get(&format!("chargers/{}", id))
     }
@@ -512,7 +522,6 @@ impl Charger {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use std::time::{Duration, Instant};
@@ -532,7 +541,6 @@ mod test {
 
         assert_eq!(&ctx.auth_header, &ctx2.auth_header);
         assert_eq!(&ctx.refresh_token, &ctx2.refresh_token);
-        assert!( (ctx.token_expiration - ctx2.token_expiration) < Duration::from_secs(5))
-
+        assert!((ctx.token_expiration - ctx2.token_expiration) < Duration::from_secs(5))
     }
 }

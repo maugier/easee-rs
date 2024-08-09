@@ -122,4 +122,15 @@ impl Stream {
         let json = self.buffer.pop().unwrap();
         Ok(Message::from_json(json)?)
     }
+
+    pub fn invoke(
+        &mut self,
+        target: &str,
+        args: serde_json::Value,
+    ) -> Result<(), tungstenite::Error> {
+        self.ws.send(json!( { "arguments": args,
+                                  "invocationId": "0",
+                                  "target": target,
+                                  "type": 1} ))
+    }
 }

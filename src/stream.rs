@@ -45,31 +45,12 @@ pub struct Stream {
 impl Stream {
     pub fn open(ctx: &mut Context) -> Result<Stream, NegotiateError> {
         let r: NegotiateResponse = ctx.post_raw(STREAM_API_NEGOTIATION_URL, &())?;
-        dbg!(&r);
 
         let token = ctx.auth_token();
         let wss_url = format!(
             "{}?id={}&access_token={}",
             WSS_URL, r.connection_token, token
         );
-        dbg!(&wss_url);
-
-        /*
-        let req = tungstenite::http::Request::builder()
-            .uri(WSS_URL)
-            .header("Accept", "* / *")
-            .header("Host", "streams.easee.com")
-            .header("Origin", "https://portal.easee.com")
-            .header("Connection", "keep-alive, Upgrade")
-            .header("Upgrade", "websocket")
-            .header("Sec-WebSocket-Version", "13")
-            .header("Sec-WebSocket-Key", tungstenite::handshake::client::generate_key())
-            .header("Sec-Fetch-Dest", "websocket")
-            .header("Sec-Fetch-Mode", "websocket")
-            .header("Sec-Fetch-Site", "same-site")
-            .header("Cookie", format!("easee_skaat=\"{}\"", token))
-            .body(()).unwrap();
-        */
 
         let resp = tungstenite::client::connect(&wss_url);
 
