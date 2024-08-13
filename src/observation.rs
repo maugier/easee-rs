@@ -1,4 +1,4 @@
-use serde::{de::IntoDeserializer, Deserialize};
+use serde::Deserialize;
 use serde_repr::Deserialize_repr;
 use std::num::{ParseFloatError, ParseIntError};
 use thiserror::Error;
@@ -6,7 +6,7 @@ use tracing::info;
 use ureq::json;
 
 use crate::{
-    api::{ChargerOpMode, Context, OutputPhase, UtcDateTime},
+    api::{ChargerOpMode, Context, UtcDateTime},
     signalr::{self, StreamError},
     stream::NegotiateError,
 };
@@ -90,6 +90,7 @@ impl ObservationData {
         })
     }
 
+    /*
     fn dynamic_type(&self) -> DataType {
         match self {
             ObservationData::Boolean(_) => DataType::Boolean,
@@ -98,6 +99,7 @@ impl ObservationData {
             ObservationData::String(_) => DataType::String,
         }
     }
+    */
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -278,7 +280,8 @@ impl Stream {
         loop {
             let msg = self.inner.recv()?;
             match &msg {
-                Empty | Ping | InvocationResult { .. } => info!("Skipped message: {msg:?}"),
+                Ping => continue,
+                Empty | InvocationResult { .. } => info!("Skipped message: {msg:?}"),
                 Invocation { target, arguments } if target == "ProductUpdate" => {
                     if arguments.len() != 1 {
                         return de(msg);
