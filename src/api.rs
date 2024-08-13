@@ -55,6 +55,20 @@ impl<'de> Deserialize<'de> for UtcDateTime {
     }
 }
 
+#[derive(Clone, Copy, Serialize, Deserialize)]
+pub struct Current {
+    pub phase1: f64,
+    pub phase2: f64,
+    pub phase3: f64,
+}
+
+#[derive(Clone, Copy, Serialize)]
+pub struct SetCurrent {
+    pub time_to_live: Option<i32>,
+    #[serde(flatten)]
+    pub current: Current
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
 #[serde(rename_all = "camelCase")]
 pub struct Charger {
@@ -202,6 +216,28 @@ pub struct Site {
     pub level_of_access: u32,
     //pub address: Address,
     pub installer_alias: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SiteDetails {
+    #[serde(flatten)]
+    pub site: Site,
+    pub circuits: Vec<Circuit>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Circuit {
+    pub id: i64,
+    pub uuid: String,
+    pub site_id: i64,
+    pub circuit_panel_id: i64,
+    pub panel_name: String,
+    pub rated_current: f64,
+    pub fuse: f64,
+    pub chargers: Vec<Charger>,
+    pub use_dynamic_master: bool,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -471,6 +507,26 @@ impl Site {
     /// Read all energy meters from the given site
     pub fn lifetime_energy(&self, ctx: &mut Context) -> Result<Vec<MeterReading>, ApiError> {
         ctx.get(&format!("sites/{}/energy", self.id))
+    }
+
+    pub fn details(&self, ctx: &mut Context) -> Result<SiteDetails, ApiError> {
+        ctx.get(&format!("sites/{}", self.id))
+    }
+}
+
+impl Circuit {
+
+    fn dynamic_current_path(&self) -> String {
+        format!("sites/{}/circuits/{}/dynamicCurrent",
+            self.site_id, self.id)
+    }
+
+    pub fn dynamic_current(&self, ctx: &mut Context) -> Result<Current, ApiError> {
+        ctx.get(&self.dynamic_current_path())
+    }
+
+    pub fn set_dynamic_current(&self, ctx: &mut Context, current: SetCurrent) -> Result<(), ApiError> {
+        ctx.post(&self.dynamic_current_path(), &current)
     }
 }
 
