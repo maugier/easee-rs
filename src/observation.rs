@@ -73,19 +73,22 @@ pub enum ObservationData {
 
 #[derive(Error, Debug)]
 pub enum ParseError {
-    #[error("integer: {0}")]
-    Integer(#[from] ParseIntError),
+    #[error("integer `{0}`: {1}")]
+    Integer(String, ParseIntError),
 
-    #[error("double: {0}")]
-    Double(#[from] ParseFloatError),
+    #[error("double `{0}: {1}")]
+    Double(String, ParseFloatError),
 }
 
 impl ObservationData {
     fn from_dynamic(value: String, data_type: DataType) -> Result<ObservationData, ParseError> {
         Ok(match data_type {
-            DataType::Boolean => ObservationData::Boolean(value.parse::<i64>()? != 0),
-            DataType::Double => ObservationData::Double(value.parse()?),
-            DataType::Integer => ObservationData::Integer(value.parse()?),
+            DataType::Boolean => ObservationData::Boolean(value.parse::<i64>()
+                .map_err(move |e| ParseError::Integer(value, e))? != 0),
+            DataType::Double => ObservationData::Double(value.parse()
+                .map_err(move|e| ParseError::Double(value, e))?),
+            DataType::Integer => ObservationData::Integer(value.parse()
+                .map_err(move |e| ParseError::Integer(value, e))?),
             DataType::String => ObservationData::String(value),
         })
     }
