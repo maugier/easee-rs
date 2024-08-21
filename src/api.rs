@@ -1,6 +1,5 @@
 use std::{
-    io,
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    io, ops::{Add, Mul, Sub}, time::{Duration, Instant, SystemTime, UNIX_EPOCH}
 };
 
 use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize};
@@ -12,7 +11,7 @@ pub struct Context {
     auth_header: String,
     refresh_token: String,
     token_expiration: Instant,
-    on_refresh: Option<Box<dyn FnMut(&mut Self)>>,
+    on_refresh: Option<Box<dyn FnMut(&mut Self) + Send>>,
 }
 
 impl std::fmt::Debug for Context {
@@ -55,18 +54,60 @@ impl<'de> Deserialize<'de> for UtcDateTime {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize)]
-pub struct Current {
+#[derive(Clone, Copy, Default, Serialize, Deserialize)]
+pub struct Triphase {
     pub phase1: f64,
     pub phase2: f64,
     pub phase3: f64,
+}
+
+impl Add<Triphase> for Triphase {
+    type Output = Triphase;
+
+    fn add(self, rhs: Triphase) -> Self::Output {
+        Triphase {
+            phase1: self.phase1 + rhs.phase1,
+            phase2: self.phase2 + rhs.phase2,
+            phase3: self.phase3 + rhs.phase3,
+         }
+    }
+}
+
+impl Sub<Triphase> for Triphase {
+    type Output = Triphase;
+
+    fn sub(self, rhs: Triphase) -> Self::Output {
+        Triphase {
+            phase1: self.phase1 + rhs.phase1,
+            phase2: self.phase2 + rhs.phase2,
+            phase3: self.phase3 + rhs.phase3,
+         }
+    }
+}
+
+impl Mul<f64> for Triphase {
+    type Output= Triphase;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        Triphase {
+            phase1: self.phase1 * rhs,
+            phase2: self.phase2 * rhs,
+            phase3: self.phase3 * rhs,
+        }
+    }
+}
+
+impl From<f64> for Triphase {
+    fn from(value: f64) -> Self {
+        Triphase { phase1: value, phase2: value, phase3: value }
+    }
 }
 
 #[derive(Clone, Copy, Serialize)]
 pub struct SetCurrent {
     pub time_to_live: Option<i32>,
     #[serde(flatten)]
-    pub current: Current
+    pub current: Triphase
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
@@ -343,7 +384,7 @@ impl Context {
         })
     }
 
-    pub fn on_refresh<F: FnMut(&mut Self) + 'static>(mut self, on_refresh: F) -> Self {
+    pub fn on_refresh<F: FnMut(&mut Self) + Send + 'static>(mut self, on_refresh: F) -> Self {
         self.on_refresh = Some(Box::new(on_refresh));
         self
     }
@@ -512,6 +553,7 @@ impl Site {
     pub fn details(&self, ctx: &mut Context) -> Result<SiteDetails, ApiError> {
         ctx.get(&format!("sites/{}", self.id))
     }
+
 }
 
 impl Circuit {
@@ -521,7 +563,7 @@ impl Circuit {
             self.site_id, self.id)
     }
 
-    pub fn dynamic_current(&self, ctx: &mut Context) -> Result<Current, ApiError> {
+    pub fn dynamic_current(&self, ctx: &mut Context) -> Result<Triphase, ApiError> {
         ctx.get(&self.dynamic_current_path())
     }
 
