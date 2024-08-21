@@ -132,6 +132,8 @@ pub enum ChargerOpMode {
     Finished = 4,
     Error = 5,
     Ready = 6,
+    AwaitingAuthentication = 7,
+    Deauthenticating = 8,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize_repr, Eq, Ord, PartialEq, PartialOrd)]
