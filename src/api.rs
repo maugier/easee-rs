@@ -461,10 +461,6 @@ impl Context {
 
     /// List all sites available to the user
     pub fn sites(&mut self) -> Result<Vec<Site>, ApiError> {
-        self.get("sites?detailed=false")
-    }
-
-    pub fn sites_details(&mut self) -> Result<Vec<SiteDetails>, ApiError> {
         self.get("sites")
     }
 
