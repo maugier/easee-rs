@@ -1,5 +1,7 @@
 use std::{
-    io, ops::{Add, Mul, Sub}, time::{Duration, Instant, SystemTime, UNIX_EPOCH}
+    io,
+    ops::{Add, Mul, Sub},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize};
@@ -54,7 +56,7 @@ impl<'de> Deserialize<'de> for UtcDateTime {
     }
 }
 
-#[derive(Clone, Copy, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
 pub struct Triphase {
     pub phase1: f64,
     pub phase2: f64,
@@ -69,7 +71,7 @@ impl Add<Triphase> for Triphase {
             phase1: self.phase1 + rhs.phase1,
             phase2: self.phase2 + rhs.phase2,
             phase3: self.phase3 + rhs.phase3,
-         }
+        }
     }
 }
 
@@ -81,12 +83,12 @@ impl Sub<Triphase> for Triphase {
             phase1: self.phase1 + rhs.phase1,
             phase2: self.phase2 + rhs.phase2,
             phase3: self.phase3 + rhs.phase3,
-         }
+        }
     }
 }
 
 impl Mul<f64> for Triphase {
-    type Output= Triphase;
+    type Output = Triphase;
 
     fn mul(self, rhs: f64) -> Self::Output {
         Triphase {
@@ -99,7 +101,11 @@ impl Mul<f64> for Triphase {
 
 impl From<f64> for Triphase {
     fn from(value: f64) -> Self {
-        Triphase { phase1: value, phase2: value, phase3: value }
+        Triphase {
+            phase1: value,
+            phase2: value,
+            phase3: value,
+        }
     }
 }
 
@@ -107,7 +113,7 @@ impl From<f64> for Triphase {
 pub struct SetCurrent {
     pub time_to_live: Option<i32>,
     #[serde(flatten)]
-    pub current: Triphase
+    pub current: Triphase,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
@@ -272,9 +278,9 @@ pub struct SiteDetails {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Circuit {
-    pub id: i64,
+    pub id: u32,
     pub uuid: String,
-    pub site_id: i64,
+    pub site_id: u32,
     pub circuit_panel_id: i64,
     pub panel_name: String,
     pub rated_current: f64,
@@ -464,6 +470,10 @@ impl Context {
         self.get("sites")
     }
 
+    pub fn site(&mut self, id: i32) -> Result<SiteDetails, ApiError> {
+        self.get(&format!("sites/{id}"))
+    }
+
     /// List all chargers available to the user
     pub fn chargers(&mut self) -> Result<Vec<Charger>, ApiError> {
         self.get("chargers")
@@ -474,6 +484,32 @@ impl Context {
             return Err(ApiError::InvalidID(id.to_owned()));
         }
         self.get(&format!("chargers/{}", id))
+    }
+
+    pub fn circuit(&mut self, site_id: u32, circuit_id: u32) -> Result<Circuit, ApiError> {
+        self.get(&format!("site/{site_id}/circuit/{circuit_id}"))
+    }
+
+    pub fn circuit_dynamic_current(
+        &mut self,
+        site_id: u32,
+        circuit_id: u32,
+    ) -> Result<Triphase, ApiError> {
+        self.get(&format!(
+            "sites/{site_id}/circuits/{circuit_id}/dynamicCurrent"
+        ))
+    }
+
+    pub fn set_circuit_dynamic_current(
+        &mut self,
+        site_id: u32,
+        circuit_id: u32,
+        current: SetCurrent,
+    ) -> Result<(), ApiError> {
+        self.post(
+            &format!("sites/{site_id}/circuits/{circuit_id}/dynamicCurrent"),
+            &current,
+        )
     }
 
     #[instrument]
@@ -555,21 +591,22 @@ impl Site {
     pub fn details(&self, ctx: &mut Context) -> Result<SiteDetails, ApiError> {
         ctx.get(&format!("sites/{}", self.id))
     }
-
 }
 
 impl Circuit {
-
     fn dynamic_current_path(&self) -> String {
-        format!("sites/{}/circuits/{}/dynamicCurrent",
-            self.site_id, self.id)
+        format!("sites/{}/circuits/{}/dynamicCurrent", self.site_id, self.id)
     }
 
     pub fn dynamic_current(&self, ctx: &mut Context) -> Result<Triphase, ApiError> {
-        ctx.get(&self.dynamic_current_path())
+        ctx.circuit_dynamic_current(self.site_id, self.id)
     }
 
-    pub fn set_dynamic_current(&self, ctx: &mut Context, current: SetCurrent) -> Result<(), ApiError> {
+    pub fn set_dynamic_current(
+        &self,
+        ctx: &mut Context,
+        current: SetCurrent,
+    ) -> Result<(), ApiError> {
         ctx.post(&self.dynamic_current_path(), &current)
     }
 }

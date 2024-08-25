@@ -83,12 +83,22 @@ pub enum ParseError {
 impl ObservationData {
     fn from_dynamic(value: String, data_type: DataType) -> Result<ObservationData, ParseError> {
         Ok(match data_type {
-            DataType::Boolean => ObservationData::Boolean(value.parse::<i64>()
-                .map_err(move |e| ParseError::Integer(value, e))? != 0),
-            DataType::Double => ObservationData::Double(value.parse()
-                .map_err(move|e| ParseError::Double(value, e))?),
-            DataType::Integer => ObservationData::Integer(value.parse()
-                .map_err(move |e| ParseError::Integer(value, e))?),
+            DataType::Boolean => ObservationData::Boolean(
+                value
+                    .parse::<i64>()
+                    .map_err(move |e| ParseError::Integer(value, e))?
+                    != 0,
+            ),
+            DataType::Double => ObservationData::Double(
+                value
+                    .parse()
+                    .map_err(move |e| ParseError::Double(value, e))?,
+            ),
+            DataType::Integer => ObservationData::Integer(
+                value
+                    .parse()
+                    .map_err(move |e| ParseError::Integer(value, e))?,
+            ),
             DataType::String => ObservationData::String(value),
         })
     }
