@@ -171,7 +171,7 @@ pub enum Observation {
     SelfTestDetails(String),
     WifiEvent(i64),
     ChargerOfflineReason(i64),
-    CircuitMaxCurrent { phase: u8, amperes: i64 },
+    CircuitMaxCurrent { phase: u8, amperes: f64 },
     SiteID(String),
     IsEnabled(bool),
     Temperature(i64),
@@ -183,10 +183,17 @@ pub enum Observation {
     MobileNetworkOperator(String),
 
     ReasonForNoCurrent(ReasonForNoCurrent),
+
+    LocalPreauthEnabled(bool),
+    LocalOfflineAuthEnabled(bool),
+    AllowOfflineTxUnknownId(bool),
+
     PilotMode(PilotMode),
     SmartCharging(bool),
     CableLocked(bool),
     CableRating(f64),
+
+
     UserId(String),
     ChargerOpMode(ChargerOpMode),
     IntCurrent { pin: InputPin, current: f64 },
@@ -198,6 +205,8 @@ pub enum Observation {
     TotalPower(f64),
     EnergyPerHour(f64),
     LifetimeEnergy(f64),
+    LifetimeRelaySwitches(i64),
+    LifetimeHours(i64),
 
     Unknown { code: u16, value: ObservationData },
 }
@@ -229,9 +238,9 @@ impl Observation {
             (2, String(details)) => SelfTestDetails(details),
             (10, Integer(wifi)) => WifiEvent(wifi),
             (11, Integer(reason)) => ChargerOfflineReason(reason),
-            (22, Integer(amperes)) => CircuitMaxCurrent { phase: 1, amperes },
-            (23, Integer(amperes)) => CircuitMaxCurrent { phase: 2, amperes },
-            (24, Integer(amperes)) => CircuitMaxCurrent { phase: 3, amperes },
+            (22, Double(amperes)) => CircuitMaxCurrent { phase: 1, amperes },
+            (23, Double(amperes)) => CircuitMaxCurrent { phase: 2, amperes },
+            (24, Double(amperes)) => CircuitMaxCurrent { phase: 3, amperes },
             (26, String(site)) => SiteID(site),
             (31, Boolean(enabled)) => IsEnabled(enabled),
             (32, Integer(temperature)) => Temperature(temperature),
@@ -252,6 +261,10 @@ impl Observation {
             (109, Integer(mode)) => ChargerOpMode(op_mode_from_int(mode)),
             (110, Integer(mode)) => ActiveOutputPhase(deserialize_i64(mode).unwrap_or(OutputPhase::Unknown)),
             (120, Double(power)) => TotalPower(power),
+            (122, Double(energy)) => EnergyPerHour(energy),
+            (124, Double(energy)) => LifetimeEnergy(energy),
+            (125, Integer(count)) => LifetimeRelaySwitches(count),
+            (126, Integer(hours)) => LifetimeHours(hours),
             (150, Integer(degrees)) => MaximumTemperature(degrees),
             (182, Double(current)) => IntCurrent { pin: T2, current },
             (183, Double(current)) => IntCurrent { pin: T3, current },
