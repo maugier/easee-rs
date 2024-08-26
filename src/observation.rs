@@ -84,10 +84,14 @@ impl ObservationData {
     fn from_dynamic(value: String, data_type: DataType) -> Result<ObservationData, ParseError> {
         Ok(match data_type {
             DataType::Boolean => ObservationData::Boolean(
-                value
+                match &*value {
+                    "False"|"false" => { false },
+                    "True"|"true" => { true }
+                    other => other
                     .parse::<i64>()
                     .map_err(move |e| ParseError::Integer(value, e))?
                     != 0,
+                }
             ),
             DataType::Double => ObservationData::Double(
                 value
