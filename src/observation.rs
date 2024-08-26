@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{de::{DeserializeOwned, IntoDeserializer}, Deserialize};
 use serde_repr::Deserialize_repr;
 use std::num::{ParseFloatError, ParseIntError};
 use thiserror::Error;
@@ -6,7 +6,7 @@ use tracing::info;
 use ureq::json;
 
 use crate::{
-    api::{ChargerOpMode, Context, UtcDateTime},
+    api::{ChargerOpMode, Context, OutputPhase, UtcDateTime},
     signalr::{self, StreamError},
     stream::NegotiateError,
 };
@@ -177,6 +177,7 @@ pub enum Observation {
     Temperature(i64),
     TriplePhase(bool),
     DynamicChargerCurrent(f64),
+    CircuitTotalCurrent { phase: u8, amperes: f64 },
 
     ICCID(String),
     MobileNetworkOperator(String),
@@ -189,6 +190,10 @@ pub enum Observation {
     UserId(String),
     ChargerOpMode(ChargerOpMode),
     IntCurrent { pin: InputPin, current: f64 },
+    IntVoltage { pins: (InputPin, InputPin), voltage: f64 },
+
+    ActiveOutputPhase(OutputPhase),
+    MaximumTemperature(i64),
 
     TotalPower(f64),
     EnergyPerHour(f64),
@@ -210,6 +215,10 @@ fn op_mode_from_int(mode: i64) -> ChargerOpMode {
     }
 }
 
+fn deserialize_i64<T: DeserializeOwned>(value: i64) -> Option<T> {
+    T::deserialize(<i64 as IntoDeserializer<serde::de::value::Error>>::into_deserializer(value)).ok()
+}
+
 impl Observation {
     fn try_from_data(code: u16, data: ObservationData) -> Observation {
         use InputPin::*;
@@ -229,6 +238,9 @@ impl Observation {
             (38, Integer(1)) => TriplePhase(false),
             (38, Integer(3)) => TriplePhase(true),
             (48, Double(current)) => DynamicChargerCurrent(current),
+            (73, Double(amperes)) => CircuitTotalCurrent { phase: 1, amperes },
+            (74, Double(amperes)) => CircuitTotalCurrent { phase: 2, amperes },
+            (75, Double(amperes)) => CircuitTotalCurrent { phase: 3, amperes },
             (81, String(iccid)) => ICCID(iccid),
             (84, String(operator)) => MobileNetworkOperator(operator),
             (96, Integer(reason)) => ReasonForNoCurrent(self::ReasonForNoCurrent(reason as u16)),
@@ -238,11 +250,24 @@ impl Observation {
             (104, Double(amps)) => CableRating(amps),
             (107, String(tok_rev)) => UserId(tok_rev.chars().rev().collect()),
             (109, Integer(mode)) => ChargerOpMode(op_mode_from_int(mode)),
+            (110, Integer(mode)) => ActiveOutputPhase(deserialize_i64(mode).unwrap_or(OutputPhase::Unknown)),
             (120, Double(power)) => TotalPower(power),
+            (150, Integer(degrees)) => MaximumTemperature(degrees),
             (182, Double(current)) => IntCurrent { pin: T2, current },
             (183, Double(current)) => IntCurrent { pin: T3, current },
             (184, Double(current)) => IntCurrent { pin: T4, current },
             (185, Double(current)) => IntCurrent { pin: T5, current },
+            (190, Double(voltage)) => IntVoltage { pins: (T1, T2), voltage },
+            (191, Double(voltage)) => IntVoltage { pins: (T1, T3), voltage },
+            (192, Double(voltage)) => IntVoltage { pins: (T1, T4), voltage },
+            (193, Double(voltage)) => IntVoltage { pins: (T1, T5), voltage },
+            (194, Double(voltage)) => IntVoltage { pins: (T2, T3), voltage },
+            (195, Double(voltage)) => IntVoltage { pins: (T2, T4), voltage },
+            (196, Double(voltage)) => IntVoltage { pins: (T2, T5), voltage },
+            (197, Double(voltage)) => IntVoltage { pins: (T3, T4), voltage },
+            (198, Double(voltage)) => IntVoltage { pins: (T3, T5), voltage },
+            (199, Double(voltage)) => IntVoltage { pins: (T4, T5), voltage },
+
 
             (code, value) => Unknown { code, value },
         }
